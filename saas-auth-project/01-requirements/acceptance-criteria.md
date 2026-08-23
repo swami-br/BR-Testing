@@ -6,4 +6,4 @@ Record testable acceptance criteria for each requirement here.
 
 - To be defined
 
-I changed this file
+- I changed this file
