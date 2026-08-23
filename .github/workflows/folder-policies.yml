@@ -1,0 +1,65 @@
+name: Folder policies
+
+on:
+  pull_request:
+    paths:
+      - "saas-auth-project/01-requirements/**"
+      - "saas-auth-project/02-prototype/screenshots/**"
+
+permissions:
+  contents: read
+
+jobs:
+  requirements-immutable:
+    name: Keep requirements non-editable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject requirements changes
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          changed_files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- 'saas-auth-project/01-requirements/**')"
+          if [[ -n "$changed_files" ]]; then
+            echo "The 01-requirements folder is non-editable."
+            echo "Changed files:"
+            printf '%s\n' "$changed_files"
+            exit 1
+          fi
+          echo "No requirements files were changed."
+
+  screenshot-size:
+    name: Check prototype screenshot sizes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Reject screenshots over 1 MiB
+        shell: bash
+        run: |
+          set -euo pipefail
+          screenshot_dir="saas-auth-project/02-prototype/screenshots"
+          oversized_files=()
+
+          if [[ -d "$screenshot_dir" ]]; then
+            while IFS= read -r -d '' file; do
+              if [[ "$(stat -c '%s' "$file")" -gt 1048576 ]]; then
+                oversized_files+=("$file ($(stat -c '%s' "$file") bytes)")
+              fi
+            done < <(find "$screenshot_dir" -type f -print0)
+          fi
+
+          if (( ${#oversized_files[@]} > 0 )); then
+            echo "Screenshots must not exceed 1 MiB:"
+            printf ' - %s\n' "${oversized_files[@]}"
+            exit 1
+          fi
+          echo "All prototype screenshots are within the 1 MiB limit."
